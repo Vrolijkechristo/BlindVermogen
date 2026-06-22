@@ -44,12 +44,16 @@ int imageResolution = 0; //Used to pretty print output
 int imageWidth = 0; //Used to pretty print output
 float closeDistance = 1000.0; // Afstand waarbinnen een target als "dichtbij" wordt beschouwd
 
+// Globale variabelen voor TOF en HLK data
+uint16_t dataTOF[8][16];
+float dataHLK[3];
+
 // Forward declarations
 void initTOF();
 void initHLK();
-void readTOF(uint16_t combinedGrid[8][16]);
-void readHLK(float result[3]);
-void calculateClosestPerson(float dataTOF[16][8], float dataHLK[3]);
+void readTOF();
+void readHLK();
+void calculateClosestPerson(uint16_t dataTOF[8][16], float dataHLK[3]);
 void initSensor(uint8_t deviceAddress);
 void changeI2CAddress(uint8_t currentAddress, uint8_t newAddress);
 void readSensorGrid(uint8_t deviceAddress, uint16_t grid[8][16], int startCol);
@@ -84,10 +88,8 @@ void loop() {
     int sensorValue = analogRead(pinPIR);
     if(sensorValue > 575) {
       Serial.println("Mens gesignaleerd");
-      uint16_t dataTOF[8][16];
-      readTOF(dataTOF);
-      float dataHLK[3];
-      readHLK(dataHLK);
+      readTOF();
+      readHLK();
       // calculateClosestPerson(dataTOF, dataHLK); // Deze functie werkt nog niet
     } else {
       Serial.println("Er is niemand");
@@ -137,40 +139,45 @@ void initHLK() {
 }
 
 // Lees TOF-sensoren en vul het grid
-void readTOF(uint16_t combinedGrid[8][16]) {
+void readTOF() {
   // Lees Sensor 1 (adres 0x29, linker 8x8 grid)
-  readSensorGrid(SENSOR1_ADDRESS, combinedGrid, 0);
+  readSensorGrid(SENSOR1_ADDRESS, dataTOF, 0);
 
   // Lees Sensor 2 (adres 0x30, rechter 8x8 grid)
-  readSensorGrid(SENSOR2_NEW_ADDRESS, combinedGrid, 8);
+  readSensorGrid(SENSOR2_NEW_ADDRESS, dataTOF, 8);
 
   // Print de heatmap
-  printHeatmap(combinedGrid);
+  printHeatmap(dataTOF);
 }
 
 // Lees HLK-radar
-void readHLK(float result[3]) {
+void readHLK() {
+  // Initialiseer dataHLK
+  dataHLK[0] = 0;
+  dataHLK[1] = 0;
+  dataHLK[2] = 0;
+
   ld2450.read();
   // HLK levert een lijst met targets (x, y, snelheid, etc.)
   for (int i = 0; i < ld2450.getSensorSupportedTargetCount(); i++) {
     const LD2450::RadarTarget result_target = ld2450.getTarget(i);
 
-    if (i == 0) {
-      result[0] = result_target.distance;
-      result[1] = result_target.x;
-      result[2] = result_target.y;
+    if (dataHLK[0] == 0) {
+      dataHLK[0] = result_target.distance;
+      dataHLK[1] = result_target.x;
+      dataHLK[2] = result_target.y;
     } else {
-      if (result_target.distance < closeDistance) {
-        result[0] = result_target.distance;
-        result[1] = result_target.x;
-        result[2] = result_target.y;
+      if (result_target.distance < dataHLK[0]) {
+        dataHLK[0] = result_target.distance;
+        dataHLK[1] = result_target.x;
+        dataHLK[2] = result_target.y;
       }
     }
   }
 }
 
 // Bereken de dichtstbijzijnde persoon (nog niet geïmplementeerd)
-void calculateClosestPerson(float dataTOF[16][8], float dataHLK[3]) {
+void calculateClosestPerson(uint16_t dataTOF[8][16], float dataHLK[3]) {
   // Hier kan logica komen om TOF en HLK data te combineren
 }
 
